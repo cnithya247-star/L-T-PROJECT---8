@@ -1,0 +1,99 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_MPU6050.h>
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+Adafruit_MPU6050 mpu;
+#define BUZZER_PIN 25  // Buzzer + to GPIO25, - to GND
+float accOffsetX = 0, accOffsetY = 0, accOffsetZ = 0;
+void calibrateMPU(int samples = 500) {
+  Serial.println("Calibrating... Keep MPU6050 still!");
+  accOffsetX = accOffsetY = accOffsetZ = 0;
+  for (int i = 0; i < samples; i++) {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+    accOffsetX += a.acceleration.x;
+    accOffsetY += a.acceleration.y;
+    accOffsetZ += (a.acceleration.z - 9.81); // subtract gravity
+    delay(5);
+  }
+  accOffsetX /= samples;
+  accOffsetY /= samples;
+  accOffsetZ /= samples;
+  Serial.println("Calibration complete!");
+  Serial.print("Offsets: ");
+  Serial.print(accOffsetX); Serial.print(", ");
+  Serial.print(accOffsetY); Serial.print(", ");
+  Serial.println(accOffsetZ);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("MPU6050 Init...");
+  display.display();
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) delay(10);
+  }
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  delay(1000);
+  calibrateMPU();
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Calibration Done!");
+  display.display();
+  delay(1000);
+}
+void loop() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  float accX = a.acceleration.x - accOffsetX;
+  float accY = a.acceleration.y - accOffsetY;
+  float accZ = a.acceleration.z - accOffsetZ;
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.setTextSize(1);
+  display.print("Acc X: "); display.println(accX, 2);
+  display.print("Acc Y: "); display.println(accY, 2);
+  display.print("Acc Z: "); display.println(accZ, 2);
+  bool motionDetected = false;
+  if (fabs(accX) > 4.0) {
+    display.setTextSize(2);
+    display.println("X Motion!");
+    Serial.println("⚠ Motion on X axis!");
+    motionDetected = true;
+  }
+  if (fabs(accY) > 4.0) {
+    display.setTextSize(2);
+    display.println("Y Motion!");
+    Serial.println("⚠ Motion on Y axis!");
+    motionDetected = true;
+  }
+  if (fabs(accZ) > 10.0) {
+    display.setTextSize(2);
+    display.println("Z Motion!");
+    Serial.println("⚠ Motion on Z axis!");
+    motionDetected = true;
+  }
+  display.display();
+  if (motionDetected) {
+    digitalWrite(BUZZER_PIN, LOW);  
+  } else {
+    digitalWrite(BUZZER_PIN, HIGH);   
+  }
+  delay(100);
+}
