@@ -1,0 +1,65 @@
+// Pin definitions using GPIO numbers
+#define RELAY_PIN 5    // GPIO5 (D1) -> Relay IN1
+#define SCL_PIN   14   // GPIO14 (D5) -> OLED SCL
+#define SDA_PIN   12   // GPIO12 (D6) -> OLED SDA
+#define SOIL_PIN  A0   // Analog pin (A0) -> Soil sensor
+// Extra LEDs
+#define LED1_PIN  4    // GPIO4 (D2)
+#define LED2_PIN  0    // GPIO0 (D3)
+#define LED3_PIN  2    // GPIO2 (D4)
+void setup() {
+  Serial.begin(115200);
+  // Relay setup
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH); // Relay OFF initially (active LOW)
+  // I2C pins (just declared, not used without OLED library)
+  pinMode(SCL_PIN, OUTPUT);
+  pinMode(SDA_PIN, OUTPUT);
+  // LED pins
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+  // Start with all LEDs OFF
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  digitalWrite(LED3_PIN, LOW);
+  Serial.println("System Ready");
+}
+void loop() {
+  int soilValue = analogRead(SOIL_PIN);
+  // Convert to percentage (0=wet, 1023=dry)
+  int moisturePercent = map(soilValue, 1023, 0, 0, 100);
+  // Print values
+  Serial.print("Soil Value: ");
+  Serial.print(soilValue);
+  Serial.print(" | Moisture: ");
+  Serial.print(moisturePercent);
+  Serial.println("%");
+  // Relay control: pump ON if soil moisture < 40%
+  if (moisturePercent < 40) {
+    digitalWrite(RELAY_PIN, LOW);  // Relay ON
+    Serial.println("Pump: ON");
+  } else {
+    digitalWrite(RELAY_PIN, HIGH); // Relay OFF
+    Serial.println("Pump: OFF");
+  }
+  // LED indicators (example usage)
+  if (moisturePercent < 30) {
+    digitalWrite(LED1_PIN, HIGH); // Very dry
+    digitalWrite(LED2_PIN, LOW);
+    digitalWrite(LED3_PIN, LOW);
+  } else if (moisturePercent < 60) {
+    digitalWrite(LED1_PIN, LOW);
+    digitalWrite(LED2_PIN, HIGH); // Moderate
+    digitalWrite(LED3_PIN, LOW);
+  } else {
+    digitalWrite(LED1_PIN, LOW);
+    digitalWrite(LED2_PIN, LOW);
+    digitalWrite(LED3_PIN, HIGH); // Wet
+  }
+
+  delay(2000);
+}
+
+
+
