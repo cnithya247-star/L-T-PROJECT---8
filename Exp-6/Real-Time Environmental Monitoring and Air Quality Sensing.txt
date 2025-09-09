@@ -1,0 +1,39 @@
+from machine import Pin, ADC, I2C
+import ssd1306
+import time
+# MQ135 on ADC0 (GP26)
+mq135 = ADC(Pin(26))
+# Buzzer on GP15
+buzzer = Pin(15, Pin.OUT)
+# I2C for OLED (use your wiring!)
+# If SDA=GP4, SCL=GP5 -> use this:
+i2c = I2C(0, scl=Pin(5), sda=Pin(4), freq=400000)\
+# If SDA=GP0, SCL=GP1 -> use this instead:
+# i2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=400000)
+# Initialize OLED (0x3C = 60)
+oled = ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3C)
+# Threshold for air quality (adjust after calibration)
+THRESHOLD = 100
+def get_ppm(value):
+    """
+    Convert raw ADC (0–65535) to a simulated PPM scale (0–1000).
+    NOTE: For real accuracy, you need MQ135 calibration curves.
+    """
+    return int((value / 65535) * 1000)
+while True:
+    raw_value = mq135.read_u16()
+    ppm = get_ppm(raw_value)
+    # Clear display
+    oled.fill(0)
+    oled.text("Air Quality", 0, 0)
+    oled.text("PPM: {}".format(ppm), 0, 20)
+
+    if ppm > THRESHOLD:
+        oled.text("Status: BAD", 0, 40)
+        buzzer.value(1)  # Turn buzzer ON
+    else:
+        oled.text("Status: GOOD", 0, 40)
+        buzzer.value(0)  # Turn buzzer OFF
+    oled.show()
+    print("Raw:", raw_value, " PPM:", ppm)
+    time.sleep(1)
